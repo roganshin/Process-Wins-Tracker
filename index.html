@@ -88,11 +88,13 @@
   .winwrap.dragging{overflow:visible;z-index:6}
   .winwrap.dragging .win{box-shadow:0 10px 26px rgba(0,0,0,.32);border-color:var(--gold-dim);background:var(--card-hi)}
   @media (prefers-color-scheme: light){.winwrap.dragging .win{box-shadow:0 10px 26px rgba(0,0,0,.14)}}
-  /* 빨간 삭제 영역: 항상 뒤에 깔려 있고, 위의 .win 카드가 덮고 있다가 밀리면 드러남 */
+  /* 빨간 삭제 영역: 평소엔 숨김(opacity 0) → 탭 시 카드 축소돼도 노출 안 됨.
+     스와이프가 실제로 시작될 때(.swiping)나 열렸을 때(.open)만 보임 */
   .swipe-del{position:absolute;top:0;right:0;bottom:0;left:0;border:none;
     background:#e0524e;color:#fff;font-size:30px;font-weight:300;
     display:flex;align-items:center;justify-content:flex-end;padding-right:27px;
-    cursor:pointer;font-family:inherit}
+    cursor:pointer;font-family:inherit;opacity:0;transition:opacity .15s}
+  .winwrap.swiping .swipe-del,.winwrap.open .swipe-del{opacity:1}
 
   .win{position:relative;z-index:1;display:flex;align-items:center;gap:13px;background:var(--card);
     border:1px solid var(--line);border-radius:14px;padding:14px 15px;cursor:pointer;
@@ -206,9 +208,11 @@
   @keyframes pageIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}
 
   /* ---------- 탭 모션: 눌림 효과 + 리플 ---------- */
-  button,.win{position:relative;overflow:hidden;touch-action:manipulation}
-  button:active,.win:active{transform:scale(.97)}
+  button{position:relative;overflow:hidden;touch-action:manipulation}
+  button:active{transform:scale(.97)}
   button{transition:transform .08s ease,opacity .15s}
+  /* 항목 탭 피드백: 카드 전체가 아니라 체크박스만 살짝 눌림 → 뒤 빨강 노출 없음 */
+  .win:active .box{transform:scale(.88)}
   .ripple{position:absolute;border-radius:50%;background:currentColor;opacity:.22;
     transform:scale(0);pointer-events:none;animation:rip .55s ease-out forwards}
   @keyframes rip{to{transform:scale(2.4);opacity:0}}
@@ -463,8 +467,37 @@ async function toggleWin(id){
   const now=!day.checks[id];
   day.checks[id]=now;
   if(now) day.times[id]=new Date().toISOString(); else delete day.times[id];
-  await saveDay(); await render();
-  if(now){const n=document.getElementById('num'); if(n){n.classList.add('pop');setTimeout(()=>n.classList.remove('pop'),250);}}
+  await saveDay();
+  applyCheck(id, now);   // 전체 재렌더 대신 부분 갱신 → 체크박스 스프링 애니메이션 유지
+}
+
+/* 체크 상태만 부분 갱신: 해당 카드의 done 클래스 토글(애니메이션 발생) + 점수/통계/오늘 점 갱신 */
+function applyCheck(id, now){
+  const win=document.querySelector(`.winwrap[data-id="${id}"] .win`);
+  if(win){
+    win.classList.toggle('done', now);
+    const ts=win.querySelector('.ts');
+    if(ts) ts.textContent = (now && day.times[id]) ? `✓ ${fmtTime(new Date(day.times[id]))} 완료` : '';
+  }
+  refreshScoreUI();
+  if(now){ const n=document.getElementById('num'); if(n){ n.classList.remove('pop'); void n.offsetWidth; n.classList.add('pop'); setTimeout(()=>n.classList.remove('pop'),260); } }
+}
+
+/* 점수/캡션/연속·총합/오늘 막대 점을 다시 그리지 않고 값만 갱신 */
+function refreshScoreUI(){
+  const total=config.wins.length, done=doneCount(), allDone=total>0&&done===total;
+  const numEl=document.getElementById('num');
+  if(numEl){ numEl.textContent=done; numEl.classList.toggle('win',allDone); }
+  const denom=document.querySelector('.score .denom'); if(denom) denom.textContent=` / ${total}`;
+  const cap=document.querySelector('.score .cap');
+  if(cap) cap.innerHTML = allDone ? '<b>오늘 완승.</b> 결과랑 무관하게 너는 이겼어.' : `오늘 <b>${done}</b>번 이겼어`;
+  const vals=document.querySelectorAll('.score .stat .v');
+  if(vals[0]) vals[0].innerHTML=`<b>${streak()}</b>`;
+  if(vals[1]) vals[1].textContent=index.length;
+  const ratio=Math.min(done/(total||1),1);
+  const fill=document.querySelector('.day.today .dot .fill'); if(fill) fill.style.height=(ratio*100)+'%';
+  const dot=document.querySelector('.day.today .dot'); if(dot) dot.classList.toggle('full',ratio>=1);
+  const n=document.querySelector('.day.today .dot .n'); if(n) n.textContent=done||'';
 }
 
 /* 꾹 눌러 텍스트 편집 (isNew=true면 비워두고 취소 시 삭제) */
@@ -548,6 +581,7 @@ function setupWinRow(wrap){
     }
     if(!horiz) return false;                           // 세로 스크롤은 그대로 둠
     _winHoriz=true;                                    // 랜딩(우측) 제스처 억제
+    wrap.classList.add('swiping');                     // 이때부터 빨강 노출(평소엔 숨김)
     dx=ddx;
     let nx=(open?-BTN:0)+ddx;
     nx=Math.max(Math.min(nx,0),-rowW());               // 0 ~ -행너비
@@ -559,13 +593,13 @@ function setupWinRow(wrap){
     win.style.transition='transform .26s cubic-bezier(.2,.8,.3,1)';
     if(horiz){
       const finalX=(open?-BTN:0)+dx;
-      if(finalX <= -rowW()*0.5){ deleteWin(id); return; }   // 행 절반 이상 → 삭제
-      else if(finalX <= -BTN*0.5){ open=true;  setX(-BTN); wrap.classList.add('open'); }  // 버튼만큼 → 열기
-      else { open=false; setX(0); wrap.classList.remove('open'); }                         // 그 외 → 닫기
+      if(finalX <= -rowW()*0.5){ deleteWin(id); return; }   // 행 절반 이상 → 삭제(빨강 유지)
+      else if(finalX <= -BTN*0.5){ open=true;  setX(-BTN); wrap.classList.remove('swiping'); wrap.classList.add('open'); }  // 열기
+      else { open=false; setX(0); wrap.classList.remove('swiping','open'); }                  // 닫기(빨강 사라짐)
     } else if(!moved && !longP){
-      if(open){ open=false; setX(0); wrap.classList.remove('open'); }  // 열린 상태 탭 → 닫기
-      else toggleWin(id);                                              // 일반 탭 → 체크
-    }
+      if(open){ open=false; setX(0); wrap.classList.remove('swiping','open'); }  // 열린 상태 탭 → 닫기
+      else toggleWin(id);                                                        // 일반 탭 → 체크
+    } else { wrap.classList.remove('swiping'); }
   }
   // 터치(모바일)
   win.addEventListener('touchstart', e=>{ const t=e.touches[0]; start(t.clientX,t.clientY); }, {passive:true});
