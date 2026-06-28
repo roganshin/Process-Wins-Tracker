@@ -83,7 +83,11 @@
   .addchip:hover{background:var(--gold-dim)}
 
   /* 스와이프 삭제용 래퍼 + 뒤에 깔린 빨간 삭제 버튼 */
-  .winwrap{position:relative;margin-bottom:10px;border-radius:14px;overflow:hidden}
+  .winwrap{position:relative;margin-bottom:10px;border-radius:14px;overflow:hidden;transition:transform .2s cubic-bezier(.2,.8,.3,1)}
+  /* 순서 이동(드래그) 중: 들어올림 + 그림자 (아이폰식) */
+  .winwrap.dragging{overflow:visible;z-index:6}
+  .winwrap.dragging .win{box-shadow:0 10px 26px rgba(0,0,0,.32);border-color:var(--gold-dim);background:var(--card-hi)}
+  @media (prefers-color-scheme: light){.winwrap.dragging .win{box-shadow:0 10px 26px rgba(0,0,0,.14)}}
   /* 빨간 삭제 영역: 항상 뒤에 깔려 있고, 위의 .win 카드가 덮고 있다가 밀리면 드러남 */
   .swipe-del{position:absolute;top:0;right:0;bottom:0;left:0;border:none;
     background:#e0524e;color:#fff;font-size:30px;font-weight:300;
@@ -106,6 +110,11 @@
   .win.done .txt{color:var(--mut)}
   .win .ts{font-size:11.5px;color:var(--gold);margin-top:3px;display:none;font-variant-numeric:tabular-nums}
   .win.done .ts{display:block}
+  /* 순서 이동 손잡이(세 줄) — 탭/체크 영역과 간섭 안 되게 우측 분리 */
+  .grip{flex:none;width:34px;height:34px;margin:-6px -8px -6px 0;display:grid;place-items:center;
+    color:var(--mut2);cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none}
+  .grip:active{cursor:grabbing;color:var(--gold)}
+  .grip svg{width:19px;height:19px;display:block;pointer-events:none}
   /* 꾹 눌러 편집 중인 텍스트 */
   .win.row-editing{cursor:text}
   .win.row-editing .box{opacity:.35}
@@ -226,6 +235,7 @@ async function sset(k,v){
 
 /* ---------- helpers ---------- */
 const SVG_CHECK='<svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#241c08" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const SVG_GRIP='<svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 const WD=['일','월','화','수','목','금','토'];
 const DEFAULT_WINS=[
   {id:'w1',label:'지원·실행 1건'},
@@ -375,6 +385,7 @@ async function render(){
       <div class="win ${day.checks[w.id]?'done':''}" data-id="${w.id}">
         <div class="box">${SVG_CHECK}</div>
         <div class="mid"><div class="txt">${esc(w.label)}</div><div class="ts">${t}</div></div>
+        <div class="grip" aria-label="순서 이동">${SVG_GRIP}</div>
       </div>
     </div>`;}).join('');
 
@@ -568,9 +579,73 @@ function setupWinRow(wrap){
     start(e.clientX,e.clientY); window.addEventListener('mousemove',mm); window.addEventListener('mouseup',mu); });
 }
 
+/* ---------- 순서 이동(드래그 앤 드롭, 아이폰식) ---------- */
+let _reord=null;
+function reorderStart(clientY, wrap){
+  const wraps=[...document.querySelectorAll('.winwrap')];
+  const idx=wraps.indexOf(wrap);
+  if(idx<0) return;
+  const rowH=wrap.offsetHeight + 10; // margin-bottom 포함
+  _reord={wrap, idx, target:idx, startY:clientY, rowH, wraps};
+  wrap.classList.add('dragging');
+  const dwin=wrap.querySelector('.win');
+  dwin.style.transition='transform .16s ease, box-shadow .18s ease';
+  dwin.style.transform='scale(1.03)';
+  wrap.style.transition='none'; // 끌리는 행은 손가락을 즉시 따라감
+  if(navigator.vibrate) try{navigator.vibrate(10);}catch(_){}
+}
+function reorderMove(clientY){
+  if(!_reord) return;
+  const {wrap, idx, startY, rowH, wraps}=_reord;
+  const dy=clientY-startY;
+  wrap.style.transform=`translateY(${dy}px)`;
+  let target=idx + Math.round(dy/rowH);
+  target=Math.max(0, Math.min(wraps.length-1, target));
+  _reord.target=target;
+  wraps.forEach((w,j)=>{
+    if(w===wrap) return;
+    let shift=0;
+    if(idx<target && j>idx && j<=target) shift=-rowH;        // 아래로 이동 → 사이 행 위로
+    else if(idx>target && j>=target && j<idx) shift=rowH;    // 위로 이동 → 사이 행 아래로
+    w.style.transform = shift ? `translateY(${shift}px)` : '';
+  });
+}
+function reorderEnd(){
+  if(!_reord) return;
+  const {wrap, idx, target, rowH}=_reord; _reord=null;
+  const dwin=wrap.querySelector('.win');
+  wrap.style.transition='transform .2s cubic-bezier(.2,.8,.3,1)';
+  wrap.style.transform=`translateY(${(target-idx)*rowH}px)`; // 빈 슬롯으로 안착
+  wrap.classList.remove('dragging');
+  dwin.style.transform=''; // 들어올림 해제(부드럽게 내려앉음)
+  setTimeout(async()=>{
+    if(target!==idx){
+      const arr=config.wins, [m]=arr.splice(idx,1); arr.splice(target,0,m);
+      await saveConfig();
+    }
+    await render(); // 인라인 transform 전부 초기화 + 새 순서 반영
+  }, 200);
+}
+function setupReorder(){
+  document.querySelectorAll('.grip').forEach(grip=>{
+    const wrap=grip.closest('.winwrap');
+    // 터치
+    grip.addEventListener('touchstart', e=>{ e.stopPropagation(); const t=e.touches[0]; reorderStart(t.clientY, wrap); }, {passive:true});
+    grip.addEventListener('touchmove',  e=>{ e.stopPropagation(); if(e.cancelable) e.preventDefault(); reorderMove(e.touches[0].clientY); }, {passive:false});
+    grip.addEventListener('touchend',   e=>{ e.stopPropagation(); reorderEnd(); }, {passive:true});
+    grip.addEventListener('touchcancel',e=>{ e.stopPropagation(); reorderEnd(); }, {passive:true});
+    // 마우스(데스크톱)
+    const gm=e=>reorderMove(e.clientY);
+    const gu=e=>{ window.removeEventListener('mousemove',gm); window.removeEventListener('mouseup',gu); reorderEnd(); };
+    grip.addEventListener('mousedown', e=>{ e.stopPropagation(); e.preventDefault();
+      reorderStart(e.clientY, wrap); window.addEventListener('mousemove',gm); window.addEventListener('mouseup',gu); });
+  });
+}
+
 function bind(){
-  // 각 항목: 탭=체크, 꾹누름=편집, 좌측으로 밀기=삭제
+  // 각 항목: 탭=체크, 꾹누름=편집, 좌측으로 밀기=삭제, 손잡이 드래그=순서이동
   document.querySelectorAll('.winwrap').forEach(setupWinRow);
+  setupReorder();
   // 빨간 삭제 버튼 탭
   document.querySelectorAll('.swipe-del').forEach(btn=>{
     btn.onclick=e=>{ e.stopPropagation(); deleteWin(btn.dataset.del); };
