@@ -9,7 +9,8 @@
 <link rel="preload" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet"></noscript>
 <link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#1b1e2b">
+<meta name="theme-color" content="#1b1e2b" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <link rel="apple-touch-icon" href="./icons/icon-180.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -20,11 +21,25 @@
     --bg:#1b1e2b;--bg2:#161824;--card:#252a3b;--card-hi:#2e3650;--line:#343b52;
     --ink:#eef1f8;--mut:#8a91a8;--mut2:#666d85;
     --gold:#e8b257;--gold-dim:#5a4a2a;--teal:#67a6ab;--teal-dim:#2c4448;
+    --bggrad:radial-gradient(120% 60% at 50% -10%, #232842 0%, var(--bg) 55%, var(--bg2) 100%);
+    --cardgrad:linear-gradient(180deg,var(--card),#222739);
+    --numgrad:linear-gradient(180deg,#fff,#cdd3e6);
+  }
+  /* 시스템이 라이트 모드일 때: 흰 배경 + 어두운 글씨 */
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#ffffff;--bg2:#f3f4f8;--card:#f6f7fb;--card-hi:#ebedf4;--line:#e3e5ee;
+      --ink:#1b1e2b;--mut:#5f6678;--mut2:#9298ab;
+      --gold:#b07d24;--gold-dim:#ead9b3;--teal:#2f7d83;--teal-dim:#d3e7e8;
+      --bggrad:radial-gradient(120% 60% at 50% -10%, #f4f1ea 0%, var(--bg) 55%, var(--bg2) 100%);
+      --cardgrad:linear-gradient(180deg,var(--card),#eef0f6);
+      --numgrad:linear-gradient(180deg,#3a3f52,#1b1e2b);
+    }
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
   html,body{background:var(--bg);color:var(--ink);font-family:'Noto Sans KR',-apple-system,'Apple SD Gothic Neo',sans-serif}
-  body{max-width:480px;margin:0 auto;padding:26px 20px 64px;min-height:100vh;
-    background:radial-gradient(120% 60% at 50% -10%, #232842 0%, var(--bg) 55%, var(--bg2) 100%)}
+  body{max-width:480px;margin:0 auto;padding:26px 20px 64px;min-height:100vh;overflow-x:hidden;
+    background:var(--bggrad)}
   @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 
   .topbar{display:flex;justify-content:space-between;align-items:baseline}
@@ -33,7 +48,7 @@
   h1{font-family:'Fraunces',serif;font-weight:600;font-size:30px;line-height:1.1;margin:6px 0 2px}
   .sub{color:var(--mut);font-size:13.5px;line-height:1.5;margin-top:8px}
 
-  .carry{margin-top:18px;background:linear-gradient(180deg,var(--card),#222739);
+  .carry{margin-top:18px;background:var(--cardgrad);
     border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:14px;padding:14px 16px}
   .carry .lbl{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:700}
   .carry .val{margin-top:5px;font-size:15.5px;font-weight:500;line-height:1.4}
@@ -41,7 +56,7 @@
 
   .score{margin:24px 0 6px;text-align:center}
   .score .num{font-family:'Fraunces',serif;font-weight:600;font-size:84px;line-height:.9;
-    background:linear-gradient(180deg,#fff,#cdd3e6);-webkit-background-clip:text;background-clip:text;color:transparent;
+    background:var(--numgrad);-webkit-background-clip:text;background-clip:text;color:transparent;
     transition:transform .25s cubic-bezier(.2,1.4,.4,1)}
   .score .num.win{background:linear-gradient(180deg,#ffe3a0,var(--gold));-webkit-background-clip:text;background-clip:text}
   .score .num.pop{transform:scale(1.12)}
@@ -108,8 +123,8 @@
 
   .tmr{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
   .tmr label{display:block;color:var(--mut);font-size:13px;line-height:1.5;margin-bottom:10px}
-  .tmr .inrow{display:flex;gap:8px}
-  .tmr input{flex:1;background:var(--bg2);border:1px solid var(--line);color:var(--ink);
+  .tmr .inrow{display:flex;gap:8px;align-items:stretch}
+  .tmr input{flex:1 1 auto;min-width:0;width:100%;background:var(--bg2);border:1px solid var(--line);color:var(--ink);
     border-radius:11px;padding:13px;font-size:15px;font-family:inherit;outline:none;transition:border-color .15s}
   .tmr input:focus{border-color:var(--gold)}
   .tmr input::placeholder{color:var(--mut2)}
@@ -129,6 +144,25 @@
     border-radius:12px;padding:14px;font-size:15px;font-family:inherit;outline:none}
   .backup-msg{color:var(--teal);font-size:12.5px;margin-top:9px;opacity:0;transition:opacity .3s}
   .backup-msg.show{opacity:1}
+
+  /* ---------- 랜딩 화면 ---------- */
+  .landing{min-height:calc(100vh - 90px);display:flex;flex-direction:column;justify-content:center;
+    text-align:center;animation:fadein .5s ease both}
+  @keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .land-eyebrow{font-size:13px;letter-spacing:.12em;color:var(--mut);font-weight:500}
+  .land-h1{font-family:'Fraunces',serif;font-weight:600;font-size:40px;line-height:1.1;margin:10px 0 0}
+  .land-sub{color:var(--mut);font-size:15px;line-height:1.6;margin-top:14px}
+  .land-note{margin:32px 0 8px;background:var(--cardgrad);border:1px solid var(--line);
+    border-left:3px solid var(--gold);border-radius:16px;padding:20px 18px;text-align:left}
+  .land-note .lbl{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:700}
+  .land-note .val{margin-top:8px;font-size:18px;font-weight:600;line-height:1.45}
+  .land-note.empty{border-left-color:var(--line);background:var(--card)}
+  .land-note.empty .val{font-size:14.5px;font-weight:400;color:var(--mut);line-height:1.6}
+  .land-btn{margin-top:30px;width:100%;background:var(--gold);color:#241c08;border:none;border-radius:14px;
+    padding:16px;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;transition:opacity .15s,transform .08s}
+  .land-btn:active{opacity:.85;transform:scale(.985)}
+  .land-skip{margin-top:14px;background:none;border:none;color:var(--mut2);font-size:13px;
+    font-family:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 </style>
 </head>
 <body>
@@ -238,6 +272,25 @@ async function importData(file){
     const msg=document.getElementById('backupMsg');
     if(msg){msg.textContent='복원 완료!';msg.classList.add('show');setTimeout(()=>msg.classList.remove('show'),3000);}
   }catch(e){alert('파일을 읽을 수 없어. JSON 형식이 맞는지 확인해.');}
+}
+
+/* ---------- 랜딩 화면: 앱 열면 먼저 보이는 인사 + 오늘의 첫 행동 ---------- */
+function renderLanding(){
+  const dateStr=`${today.getMonth()+1}월 ${today.getDate()}일 ${WD[today.getDay()]}요일`;
+  const h=new Date().getHours();
+  const greet = h<5?'아직 밤이야' : h<12?'좋은 아침이야' : h<18?'좋은 오후야' : '좋은 저녁이야';
+  const noteBlock = day.note
+    ? `<div class="land-note"><div class="lbl">오늘의 첫 행동</div><div class="val">${esc(day.note)}</div></div>`
+    : `<div class="land-note empty"><div class="val">오늘의 첫 행동은 아직 비어 있어.<br>점수판에서 내일 할 한 가지를 미리 정해두면, 다음 날 여기 떠 있어.</div></div>`;
+  document.getElementById('app').innerHTML=`
+    <div class="landing">
+      <div class="land-eyebrow">${dateStr}</div>
+      <h1 class="land-h1">${greet}.</h1>
+      <p class="land-sub">결과는 네 손에 없어.<br>손에 있는 과정만 세자. 했으면 이긴 거.</p>
+      ${noteBlock}
+      <button class="land-btn" id="enterBtn">오늘 점수판 열기</button>
+    </div>`;
+  document.getElementById('enterBtn').onclick=()=>{ render(); window.scrollTo(0,0); };
 }
 
 /* ---------- render ---------- */
@@ -390,7 +443,7 @@ const _loadGuard=setTimeout(()=>{
   try{
     await load();
     clearTimeout(_loadGuard);
-    await render();
+    renderLanding();
   }catch(err){
     clearTimeout(_loadGuard);
     document.getElementById('app').innerHTML=`<div class="loading" style="color:#e07070">오류: ${err&&err.message?err.message:'알 수 없는 오류'}${_reloadBtn}</div>`;
