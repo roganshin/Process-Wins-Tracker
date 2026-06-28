@@ -6,7 +6,8 @@
 <title>오늘의 점수판</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet"></noscript>
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#1b1e2b">
 <link rel="apple-touch-icon" href="./icons/icon-180.png">
@@ -379,12 +380,20 @@ function tick(){
 }
 setInterval(tick,30000);
 
+const _reloadBtn=`<br><br><button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;background:#e8b257;color:#241c08;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer">새로고침</button>`;
+const _loadGuard=setTimeout(()=>{
+  const a=document.getElementById('app');
+  if(a&&a.querySelector('.loading'))
+    a.innerHTML=`<div class="loading">로딩이 너무 오래 걸려.<br>브라우저 캐시를 지우고 새로고침해봐.${_reloadBtn}</div>`;
+},8000);
 (async()=>{
   try{
     await load();
+    clearTimeout(_loadGuard);
     await render();
   }catch(err){
-    document.getElementById('app').innerHTML=`<div class="loading" style="color:#e07070">오류: ${err&&err.message?err.message:'알 수 없는 오류'}<br><br><button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;background:#e8b257;color:#241c08;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer">새로고침</button></div>`;
+    clearTimeout(_loadGuard);
+    document.getElementById('app').innerHTML=`<div class="loading" style="color:#e07070">오류: ${err&&err.message?err.message:'알 수 없는 오류'}${_reloadBtn}</div>`;
     console.error('[점수판] init error:', err);
   }
 })();
