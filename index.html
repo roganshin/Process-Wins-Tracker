@@ -84,11 +84,11 @@
 
   /* 스와이프 삭제용 래퍼 + 뒤에 깔린 빨간 삭제 버튼 */
   .winwrap{position:relative;margin-bottom:10px;border-radius:14px;overflow:hidden}
-  .swipe-del{position:absolute;top:0;right:0;height:100%;width:76px;border:none;
-    background:#e0524e;color:#fff;font-size:30px;font-weight:300;line-height:0;
-    display:grid;place-items:center;cursor:pointer;font-family:inherit;
-    opacity:0;transition:opacity .15s}
-  .winwrap.peek .swipe-del,.winwrap.open .swipe-del{opacity:1}
+  /* 빨간 삭제 영역: 항상 뒤에 깔려 있고, 위의 .win 카드가 덮고 있다가 밀리면 드러남 */
+  .swipe-del{position:absolute;top:0;right:0;bottom:0;left:0;border:none;
+    background:#e0524e;color:#fff;font-size:30px;font-weight:300;
+    display:flex;align-items:center;justify-content:flex-end;padding-right:27px;
+    cursor:pointer;font-family:inherit}
 
   .win{position:relative;z-index:1;display:flex;align-items:center;gap:13px;background:var(--card);
     border:1px solid var(--line);border-radius:14px;padding:14px 15px;cursor:pointer;
@@ -503,55 +503,69 @@ async function doDelete(id){
   await saveConfig(); await saveDay(); await render();
 }
 
-/* 한 항목의 탭/꾹누름/스와이프 제스처 처리 */
+/* 한 항목의 탭/꾹누름/스와이프 제스처 처리
+   - 방향 잠금(14px) 전에는 아무 일도 안 함 → 깜빡임 없음
+   - 가로 잠기면 preventDefault로 브라우저 스크롤/취소 차단 → '멀리 밀면 되돌아감' 해결
+   - 빨간 영역은 항상 뒤에 깔려 있어 .win 카드만 이동(transform) */
 function setupWinRow(wrap){
   const win=wrap.querySelector('.win');
   const id=wrap.dataset.id;
-  const W=76; // 삭제버튼 폭
-  let sx=0,sy=0,dx=0,drag=false,horiz=false,open=false,moved=false,lp=null,longP=false;
+  const BTN=76;                  // 살짝 열었을 때 드러나는 폭
+  const DECIDE=14;               // 방향 결정 임계(px) — 이하에선 무반응
+  let sx=0,sy=0,dx=0,drag=false,decided=false,horiz=false,open=false,moved=false,lp=null,longP=false;
   const setX=x=>{ win.style.transform=`translateX(${x}px)`; };
   const clearLP=()=>{ if(lp){clearTimeout(lp);lp=null;} };
+  const rowW=()=>wrap.offsetWidth||320;
 
   function start(x,y){
-    if(win.classList.contains('row-editing')) return; // 편집 중엔 제스처 무시
-    sx=x;sy=y;dx=0;drag=true;horiz=false;moved=false;longP=false;
+    if(win.classList.contains('row-editing')) return;
+    sx=x;sy=y;dx=0;drag=true;decided=false;horiz=false;moved=false;longP=false;
     win.style.transition='none';
     clearLP();
     lp=setTimeout(()=>{ if(!moved && !open){ longP=true; beginEdit(win,id); } }, 480);
   }
+  // 반환값 true = 가로 제스처를 소비함(브라우저 동작 막아야 함)
   function move(x,y){
-    if(!drag) return;
+    if(!drag) return false;
     const ddx=x-sx, ddy=y-sy;
-    if(!horiz && Math.abs(ddx)>8 && Math.abs(ddx)>Math.abs(ddy)){ horiz=true; clearLP(); }
-    if(Math.abs(ddx)>6||Math.abs(ddy)>6){ moved=true; clearLP(); }
-    if(horiz){
-      dx=ddx;
-      const base=open?-W:0;
-      if(base<0 || ddx<0) _winHoriz=true; // 좌측 스와이프 중엔 랜딩 제스처 억제
-      let nx=Math.max(Math.min(base+ddx,0),-W-26);
-      setX(nx);
-      wrap.classList.toggle('peek', nx<-6);
+    if(Math.abs(ddx)>4||Math.abs(ddy)>4){ moved=true; clearLP(); }
+    if(!decided){
+      if(Math.abs(ddx)>=DECIDE || Math.abs(ddy)>=DECIDE){
+        decided=true;
+        horiz = Math.abs(ddx) > Math.abs(ddy)*1.3;   // 가로가 확실히 우세할 때만
+      } else return false;                            // 아직 방향 미정 → 스크롤 허용
     }
+    if(!horiz) return false;                           // 세로 스크롤은 그대로 둠
+    _winHoriz=true;                                    // 랜딩(우측) 제스처 억제
+    dx=ddx;
+    let nx=(open?-BTN:0)+ddx;
+    nx=Math.max(Math.min(nx,0),-rowW());               // 0 ~ -행너비
+    setX(nx);
+    return true;
   }
-  function end(){
+  function settle(){
     if(!drag) return; drag=false; clearLP();
-    win.style.transition='transform .25s cubic-bezier(.2,.8,.3,1)';
+    win.style.transition='transform .26s cubic-bezier(.2,.8,.3,1)';
     if(horiz){
-      const finalX=(open?-W:0)+dx;
-      if(finalX < -W*0.62){ deleteWin(id); return; }
-      else if(finalX < -W*0.34){ open=true; setX(-W); wrap.classList.add('open'); }
-      else { open=false; setX(0); wrap.classList.remove('open','peek'); }
+      const finalX=(open?-BTN:0)+dx;
+      if(finalX <= -rowW()*0.5){ deleteWin(id); return; }   // 행 절반 이상 → 삭제
+      else if(finalX <= -BTN*0.5){ open=true;  setX(-BTN); wrap.classList.add('open'); }  // 버튼만큼 → 열기
+      else { open=false; setX(0); wrap.classList.remove('open'); }                         // 그 외 → 닫기
     } else if(!moved && !longP){
-      if(open){ open=false; setX(0); wrap.classList.remove('open','peek'); }
-      else toggleWin(id);
+      if(open){ open=false; setX(0); wrap.classList.remove('open'); }  // 열린 상태 탭 → 닫기
+      else toggleWin(id);                                              // 일반 탭 → 체크
     }
   }
-  win.addEventListener('pointerdown', e=>{ if(win.classList.contains('row-editing')) return;
-    if(e.pointerType==='mouse'&&e.button!==0) return; try{win.setPointerCapture(e.pointerId);}catch(_){}
-    start(e.clientX,e.clientY); }, {passive:true});
-  win.addEventListener('pointermove', e=>move(e.clientX,e.clientY), {passive:true});
-  win.addEventListener('pointerup',   e=>{ dx=e.clientX-sx; end(); }, {passive:true});
-  win.addEventListener('pointercancel', ()=>{ drag=false; clearLP(); win.style.transition='transform .25s'; setX(open?-W:0); }, {passive:true});
+  // 터치(모바일)
+  win.addEventListener('touchstart', e=>{ const t=e.touches[0]; start(t.clientX,t.clientY); }, {passive:true});
+  win.addEventListener('touchmove',  e=>{ const t=e.touches[0]; if(move(t.clientX,t.clientY) && e.cancelable) e.preventDefault(); }, {passive:false});
+  win.addEventListener('touchend',   e=>{ const t=e.changedTouches[0]; if(t) dx=t.clientX-sx; settle(); }, {passive:true});
+  win.addEventListener('touchcancel',e=>{ const t=e.changedTouches[0]; if(t) dx=t.clientX-sx; settle(); }, {passive:true});
+  // 마우스(데스크톱) — 드래그 중에만 window 리스너 부착/해제(누수 방지)
+  const mm=e=>move(e.clientX,e.clientY);
+  const mu=e=>{ dx=e.clientX-sx; window.removeEventListener('mousemove',mm); window.removeEventListener('mouseup',mu); settle(); };
+  win.addEventListener('mousedown', e=>{ if(e.button!==0||win.classList.contains('row-editing')) return;
+    start(e.clientX,e.clientY); window.addEventListener('mousemove',mm); window.addEventListener('mouseup',mu); });
 }
 
 function bind(){
