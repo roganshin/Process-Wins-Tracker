@@ -72,31 +72,51 @@
   .sectlbl{display:flex;align-items:center;gap:10px;margin:30px 4px 12px;color:var(--mut);
     font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:700}
   .sectlbl::after{content:"";flex:1;height:1px;background:var(--line)}
+  /* + 항목추가 동그라미 버튼 (과정 승리 헤더 우측) */
+  .sectlbl-add::after{display:none}
+  .sectlbl-add .ln{flex:1;height:1px;background:var(--line)}
+  .addchip{flex:none;width:28px;height:28px;border-radius:50%;border:1.5px solid var(--gold);
+    background:transparent;color:var(--gold);font-size:19px;line-height:0;font-weight:400;
+    display:grid;place-items:center;cursor:pointer;font-family:inherit;padding:0;
+    transition:background .15s,transform .12s}
+  .addchip:active{transform:scale(.9)}
+  .addchip:hover{background:var(--gold-dim)}
 
-  .win{display:flex;align-items:center;gap:13px;background:var(--card);border:1px solid var(--line);
-    border-radius:14px;padding:14px 15px;margin-bottom:10px;cursor:pointer;transition:background .15s,border-color .15s,transform .08s}
-  .win:active{transform:scale(.985)}
+  /* 스와이프 삭제용 래퍼 + 뒤에 깔린 빨간 삭제 버튼 */
+  .winwrap{position:relative;margin-bottom:10px;border-radius:14px;overflow:hidden}
+  .swipe-del{position:absolute;top:0;right:0;height:100%;width:76px;border:none;
+    background:#e0524e;color:#fff;font-size:30px;font-weight:300;line-height:0;
+    display:grid;place-items:center;cursor:pointer;font-family:inherit;
+    opacity:0;transition:opacity .15s}
+  .winwrap.peek .swipe-del,.winwrap.open .swipe-del{opacity:1}
+
+  .win{position:relative;z-index:1;display:flex;align-items:center;gap:13px;background:var(--card);
+    border:1px solid var(--line);border-radius:14px;padding:14px 15px;cursor:pointer;
+    transition:transform .25s cubic-bezier(.2,.8,.3,1),background .15s,border-color .15s;
+    will-change:transform;touch-action:pan-y}
   .win.done{background:linear-gradient(90deg,#2c2a22,#262a3b);border-color:var(--gold-dim)}
+  @media (prefers-color-scheme: light){.win.done{background:linear-gradient(90deg,#faf3e2,#eef0f6)}}
   .box{flex:none;width:26px;height:26px;border-radius:9px;border:2px solid var(--mut2);
     display:grid;place-items:center;transition:all .18s}
   .win.done .box{background:var(--gold);border-color:var(--gold)}
   .box svg{width:15px;height:15px;opacity:0;transform:scale(.4);transition:all .2s cubic-bezier(.2,1.5,.4,1)}
   .win.done .box svg{opacity:1;transform:scale(1)}
   .win .mid{flex:1;min-width:0}
-  .win .txt{font-size:15.5px;font-weight:500;transition:color .15s}
+  .win .txt{font-size:15.5px;font-weight:500;transition:color .15s;outline:none;border-radius:6px}
   .win.done .txt{color:var(--mut)}
   .win .ts{font-size:11.5px;color:var(--gold);margin-top:3px;display:none;font-variant-numeric:tabular-nums}
   .win.done .ts{display:block}
-  .win .del{flex:none;color:var(--mut2);font-size:20px;width:28px;height:28px;display:none;
-    align-items:center;justify-content:center;border-radius:8px}
-  body.editing .win .del{display:flex}
-  body.editing .win{cursor:default}
+  /* 꾹 눌러 편집 중인 텍스트 */
+  .win.row-editing{cursor:text}
+  .win.row-editing .box{opacity:.35}
+  .txt.editing-txt{background:var(--bg2);box-shadow:0 0 0 2px var(--gold) inset;padding:2px 7px;margin:-2px -7px}
+  .txt.editing-txt:empty:before{content:'항목 입력…';color:var(--mut2)}
+  .winwrap.removing{transition:height .28s ease,margin .28s ease,opacity .28s ease;overflow:hidden}
+  .hint{text-align:center;color:var(--mut2);font-size:11px;margin:2px 0 4px}
 
-  .rowbtns{display:flex;gap:10px;margin-top:2px}
   .ghost{flex:1;background:transparent;border:1px dashed var(--line);color:var(--mut);
     border-radius:12px;padding:12px;font-size:13.5px;font-weight:500;font-family:inherit;cursor:pointer;transition:all .15s}
   .ghost:active{background:var(--card)}
-  .ghost.on{border-style:solid;border-color:var(--gold-dim);color:var(--gold)}
 
   .rest{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 16px;text-align:center}
   .rest p{color:var(--mut);font-size:13px;line-height:1.55;margin-bottom:14px}
@@ -170,6 +190,11 @@
     font-family:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
   .landing.swipe-in{animation:slideInLeft .34s cubic-bezier(.2,.8,.3,1) both}
   @keyframes slideInLeft{from{opacity:0;transform:translateX(-44px)}to{opacity:1;transform:none}}
+  /* 랜딩 → 본화면 고급 전환: 랜딩은 왼쪽으로 빠지고, 본화면은 오른쪽에서 들어옴 */
+  .landing.leaving{animation:landLeave .36s cubic-bezier(.45,0,.2,1) forwards;pointer-events:none}
+  @keyframes landLeave{to{opacity:0;transform:translateX(-34px) scale(.985);filter:blur(2px)}}
+  .page-in{animation:pageIn .42s cubic-bezier(.2,.8,.25,1) both}
+  @keyframes pageIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}
 
   /* ---------- 탭 모션: 눌림 효과 + 리플 ---------- */
   button,.win{position:relative;overflow:hidden;touch-action:manipulation}
@@ -232,7 +257,6 @@ let TODAY, today;
 let config={wins:DEFAULT_WINS.slice()};
 let day={checks:{},times:{},rest:0,note:''};
 let index=[];
-let editing=false;
 
 function setToday(){ today=new Date(); today.setHours(0,0,0,0); TODAY=keyOf(today); }
 
@@ -315,7 +339,23 @@ function renderLanding(swipe){
       ${noteBlock}
       <button class="land-btn" id="enterBtn">오늘 점수판 열기</button>
     </div>`;
-  document.getElementById('enterBtn').onclick=()=>{ render(); window.scrollTo(0,0); };
+  document.getElementById('enterBtn').onclick=()=>enterApp();
+}
+
+/* 랜딩 → 본화면: 랜딩이 부드럽게 빠지고 본화면이 슬라이드-페이드로 들어옴 */
+function enterApp(){
+  const land=document.querySelector('.landing');
+  const go=async()=>{
+    await render();
+    const app=document.getElementById('app');
+    app.classList.add('page-in');
+    setTimeout(()=>app.classList.remove('page-in'),440);
+    window.scrollTo(0,0);
+  };
+  if(land && !_reduceMotion){
+    land.classList.add('leaving');
+    setTimeout(go,300);
+  } else { go(); }
 }
 
 /* ---------- render ---------- */
@@ -330,10 +370,12 @@ async function render(){
 
   const winRows=config.wins.map(w=>{
     const t=day.times[w.id]?`✓ ${fmtTime(new Date(day.times[w.id]))} 완료`:'';
-    return `<div class="win ${day.checks[w.id]?'done':''}" data-id="${w.id}">
-      <div class="box">${SVG_CHECK}</div>
-      <div class="mid"><div class="txt">${esc(w.label)}</div><div class="ts">${t}</div></div>
-      <div class="del" data-del="${w.id}">×</div>
+    return `<div class="winwrap" data-id="${w.id}">
+      <button class="swipe-del" data-del="${w.id}" aria-label="삭제">−</button>
+      <div class="win ${day.checks[w.id]?'done':''}" data-id="${w.id}">
+        <div class="box">${SVG_CHECK}</div>
+        <div class="mid"><div class="txt">${esc(w.label)}</div><div class="ts">${t}</div></div>
+      </div>
     </div>`;}).join('');
 
   let cells=[];
@@ -363,13 +405,9 @@ async function render(){
       </div>
     </div>
 
-    <div class="sectlbl">과정 승리</div>
+    <div class="sectlbl sectlbl-add"><span>과정 승리</span><span class="ln"></span><button class="addchip" id="addBtn" aria-label="항목 추가">+</button></div>
     ${winRows}
-    <div class="adder" id="adder"><input id="newwin" placeholder="새 항목 입력 후 Enter" maxlength="40"></div>
-    <div class="rowbtns">
-      <button class="ghost" id="addBtn">+ 항목 추가</button>
-      <button class="ghost ${editing?'on':''}" id="editBtn">${editing?'완료':'편집'}</button>
-    </div>
+    <div class="hint">꾹 누르면 수정 · 왼쪽으로 밀면 삭제</div>
 
     <div class="sectlbl">반응성 휴식</div>
     <div class="rest">
@@ -407,30 +445,130 @@ async function render(){
     <div class="foot">매일 밤 한 번 들러서 점수만 채워.<br><span class="badge">${STORE_LABEL} · 시간 자동 연동</span></div>
   `;
   bind();
-  document.body.classList.toggle('editing',editing);
+}
+
+/* 체크 토글 */
+async function toggleWin(id){
+  const now=!day.checks[id];
+  day.checks[id]=now;
+  if(now) day.times[id]=new Date().toISOString(); else delete day.times[id];
+  await saveDay(); await render();
+  if(now){const n=document.getElementById('num'); if(n){n.classList.add('pop');setTimeout(()=>n.classList.remove('pop'),250);}}
+}
+
+/* 꾹 눌러 텍스트 편집 (isNew=true면 비워두고 취소 시 삭제) */
+function beginEdit(win, id, isNew){
+  if(!win) return;
+  const txt=win.querySelector('.txt');
+  if(!txt || txt.getAttribute('contenteditable')==='true') return;
+  if(navigator.vibrate) try{navigator.vibrate(12);}catch(e){}
+  win.classList.add('row-editing');
+  txt.classList.add('editing-txt');
+  txt.setAttribute('contenteditable','true');
+  txt.focus();
+  const sel=getSelection(), rng=document.createRange();
+  rng.selectNodeContents(txt); sel.removeAllRanges(); sel.addRange(rng);
+  let done=false;
+  const finish=async()=>{
+    if(done) return; done=true;
+    txt.removeEventListener('blur',finish); txt.removeEventListener('keydown',onkey);
+    txt.removeAttribute('contenteditable'); txt.classList.remove('editing-txt'); win.classList.remove('row-editing');
+    const val=txt.textContent.trim();
+    const w=config.wins.find(x=>x.id===id);
+    if(val){ if(w&&w.label!==val){ w.label=val; await saveConfig(); } }
+    else { config.wins=config.wins.filter(x=>x.id!==id); delete day.checks[id]; delete day.times[id]; await saveConfig(); await saveDay(); }
+    await render();
+  };
+  const onkey=(e)=>{
+    if(e.key==='Enter'){ e.preventDefault(); txt.blur(); }
+    else if(e.key==='Escape'){ if(isNew) txt.textContent=''; else { const w=config.wins.find(x=>x.id===id); txt.textContent=w?w.label:''; } txt.blur(); }
+  };
+  txt.addEventListener('blur',finish);
+  txt.addEventListener('keydown',onkey);
+}
+
+/* 삭제: 슬라이드 아웃 + 높이 접힘 애니메이션 후 데이터에서 제거 */
+function deleteWin(id){
+  const wrap=document.querySelector(`.winwrap[data-id="${id}"]`);
+  if(!wrap || _reduceMotion){ doDelete(id); return; }
+  const win=wrap.querySelector('.win');
+  win.style.transition='transform .22s ease'; win.style.transform='translateX(-100%)';
+  wrap.style.height=wrap.offsetHeight+'px';
+  wrap.classList.add('removing');
+  requestAnimationFrame(()=>{ wrap.style.height='0px'; wrap.style.marginBottom='0px'; wrap.style.opacity='0'; });
+  setTimeout(()=>doDelete(id), 290);
+}
+async function doDelete(id){
+  config.wins=config.wins.filter(w=>w.id!==id); delete day.checks[id]; delete day.times[id];
+  await saveConfig(); await saveDay(); await render();
+}
+
+/* 한 항목의 탭/꾹누름/스와이프 제스처 처리 */
+function setupWinRow(wrap){
+  const win=wrap.querySelector('.win');
+  const id=wrap.dataset.id;
+  const W=76; // 삭제버튼 폭
+  let sx=0,sy=0,dx=0,drag=false,horiz=false,open=false,moved=false,lp=null,longP=false;
+  const setX=x=>{ win.style.transform=`translateX(${x}px)`; };
+  const clearLP=()=>{ if(lp){clearTimeout(lp);lp=null;} };
+
+  function start(x,y){
+    if(win.classList.contains('row-editing')) return; // 편집 중엔 제스처 무시
+    sx=x;sy=y;dx=0;drag=true;horiz=false;moved=false;longP=false;
+    win.style.transition='none';
+    clearLP();
+    lp=setTimeout(()=>{ if(!moved && !open){ longP=true; beginEdit(win,id); } }, 480);
+  }
+  function move(x,y){
+    if(!drag) return;
+    const ddx=x-sx, ddy=y-sy;
+    if(!horiz && Math.abs(ddx)>8 && Math.abs(ddx)>Math.abs(ddy)){ horiz=true; clearLP(); }
+    if(Math.abs(ddx)>6||Math.abs(ddy)>6){ moved=true; clearLP(); }
+    if(horiz){
+      dx=ddx;
+      const base=open?-W:0;
+      if(base<0 || ddx<0) _winHoriz=true; // 좌측 스와이프 중엔 랜딩 제스처 억제
+      let nx=Math.max(Math.min(base+ddx,0),-W-26);
+      setX(nx);
+      wrap.classList.toggle('peek', nx<-6);
+    }
+  }
+  function end(){
+    if(!drag) return; drag=false; clearLP();
+    win.style.transition='transform .25s cubic-bezier(.2,.8,.3,1)';
+    if(horiz){
+      const finalX=(open?-W:0)+dx;
+      if(finalX < -W*0.62){ deleteWin(id); return; }
+      else if(finalX < -W*0.34){ open=true; setX(-W); wrap.classList.add('open'); }
+      else { open=false; setX(0); wrap.classList.remove('open','peek'); }
+    } else if(!moved && !longP){
+      if(open){ open=false; setX(0); wrap.classList.remove('open','peek'); }
+      else toggleWin(id);
+    }
+  }
+  win.addEventListener('pointerdown', e=>{ if(win.classList.contains('row-editing')) return;
+    if(e.pointerType==='mouse'&&e.button!==0) return; try{win.setPointerCapture(e.pointerId);}catch(_){}
+    start(e.clientX,e.clientY); }, {passive:true});
+  win.addEventListener('pointermove', e=>move(e.clientX,e.clientY), {passive:true});
+  win.addEventListener('pointerup',   e=>{ dx=e.clientX-sx; end(); }, {passive:true});
+  win.addEventListener('pointercancel', ()=>{ drag=false; clearLP(); win.style.transition='transform .25s'; setX(open?-W:0); }, {passive:true});
 }
 
 function bind(){
-  document.querySelectorAll('.win').forEach(el=>{
-    el.onclick=async()=>{
-      if(editing) return;
-      const id=el.dataset.id, now=!day.checks[id];
-      day.checks[id]=now;
-      if(now) day.times[id]=new Date().toISOString(); else delete day.times[id];
-      await saveDay(); await render();
-      if(now){const n=document.getElementById('num');n.classList.add('pop');setTimeout(()=>n.classList.remove('pop'),250);}
-    };
+  // 각 항목: 탭=체크, 꾹누름=편집, 좌측으로 밀기=삭제
+  document.querySelectorAll('.winwrap').forEach(setupWinRow);
+  // 빨간 삭제 버튼 탭
+  document.querySelectorAll('.swipe-del').forEach(btn=>{
+    btn.onclick=e=>{ e.stopPropagation(); deleteWin(btn.dataset.del); };
   });
-  document.querySelectorAll('[data-del]').forEach(el=>{
-    el.onclick=async e=>{e.stopPropagation();const id=el.dataset.del;
-      config.wins=config.wins.filter(w=>w.id!==id); delete day.checks[id]; delete day.times[id];
-      await saveConfig(); await saveDay(); await render();};
-  });
-  document.getElementById('editBtn').onclick=async()=>{editing=!editing;await render();};
-  document.getElementById('addBtn').onclick=()=>{const a=document.getElementById('adder');a.classList.add('show');document.getElementById('newwin').focus();};
-  const nw=document.getElementById('newwin');
-  if(nw) nw.onkeydown=async e=>{if(e.key==='Enter'&&e.target.value.trim()){
-    config.wins.push({id:'w'+Date.now(),label:e.target.value.trim()}); await saveConfig(); await render();}};
+  // + 항목 추가 → 새 빈 항목 만들고 바로 편집 모드
+  document.getElementById('addBtn').onclick=async()=>{
+    const id='w'+Date.now();
+    config.wins.push({id,label:''});
+    await saveConfig(); await render();
+    const wrap=document.querySelector(`.winwrap[data-id="${id}"]`);
+    if(wrap){ beginEdit(wrap.querySelector('.win'), id, true); wrap.scrollIntoView({behavior:'smooth',block:'center'}); }
+  };
   document.getElementById('restBtn').onclick=async()=>{
     day.rest=(day.rest||0)+1; await saveDay();
     const line=REST_LINES[(day.rest-1)%REST_LINES.length], m=document.getElementById('restMsg');
@@ -470,15 +608,16 @@ function spawnRipple(el, x, y){
   setTimeout(()=>r.remove(),560);
 }
 document.addEventListener('pointerdown', e=>{
-  const el=e.target.closest('button, .win');
+  const el=e.target.closest('button');   // 항목(.win)은 자체 스와이프/체크 모션이 있어 제외
   if(el) spawnRipple(el, e.clientX, e.clientY);
 }, {passive:true});
 
 /* ---------- 제스처: 왼→오른쪽 슬라이드 시 랜딩 페이지 ---------- */
-let _sx=0,_sy=0,_st=0,_swiping=false;
-function _gestStart(x,y){ _sx=x; _sy=y; _st=Date.now(); _swiping=true; }
+let _sx=0,_sy=0,_st=0,_swiping=false,_winHoriz=false;
+function _gestStart(x,y){ _sx=x; _sy=y; _st=Date.now(); _swiping=true; _winHoriz=false; }
 function _gestEnd(x,y){
   if(!_swiping) return; _swiping=false;
+  if(_winHoriz){ _winHoriz=false; return; }  // 항목을 좌측으로 미는 중이면 랜딩 제스처 무시
   const dx=x-_sx, dy=y-_sy, dt=Date.now()-_st;
   // 오른쪽으로 충분히(70px+), 빠르게(600ms내), 가로 위주로 이동했을 때
   if(dt<600 && dx>70 && Math.abs(dx) > Math.abs(dy)*1.8){
