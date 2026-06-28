@@ -266,7 +266,7 @@ async function render(){
     const ratio=Math.min(dn/(config.wins.length||1),1), full=ratio>=1;
     cells.push(`<div class="day ${i===0?'today':''}">
       <div class="dot ${full?'full':''}"><span class="fill" style="height:${ratio*100}%"></span><span class="n">${dn||''}</span></div>
-      <div class="wd">${WD[dd.getDay()]}</div></div>`;
+      <div class="wd">${WD[dd.getDay()]}</div></div>`);
   }
 
   document.getElementById('app').innerHTML=`
