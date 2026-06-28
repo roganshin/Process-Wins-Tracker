@@ -379,7 +379,15 @@ function tick(){
 }
 setInterval(tick,30000);
 
-(async()=>{ await load(); await render(); })();
+(async()=>{
+  try{
+    await load();
+    await render();
+  }catch(err){
+    document.getElementById('app').innerHTML=`<div class="loading" style="color:#e07070">오류: ${err&&err.message?err.message:'알 수 없는 오류'}<br><br><button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;background:#e8b257;color:#241c08;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer">새로고침</button></div>`;
+    console.error('[점수판] init error:', err);
+  }
+})();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
