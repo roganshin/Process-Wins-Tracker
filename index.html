@@ -168,6 +168,17 @@
   .land-btn:active{opacity:.85;transform:scale(.985)}
   .land-skip{margin-top:14px;background:none;border:none;color:var(--mut2);font-size:13px;
     font-family:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+  .landing.swipe-in{animation:slideInLeft .34s cubic-bezier(.2,.8,.3,1) both}
+  @keyframes slideInLeft{from{opacity:0;transform:translateX(-44px)}to{opacity:1;transform:none}}
+
+  /* ---------- 탭 모션: 눌림 효과 + 리플 ---------- */
+  button,.win{position:relative;overflow:hidden;touch-action:manipulation}
+  button:active,.win:active{transform:scale(.97)}
+  button{transition:transform .08s ease,opacity .15s}
+  .ripple{position:absolute;border-radius:50%;background:currentColor;opacity:.22;
+    transform:scale(0);pointer-events:none;animation:rip .55s ease-out forwards}
+  @keyframes rip{to{transform:scale(2.4);opacity:0}}
+  /* 동작 줄이기 설정 시 모든 모션 비활성화(기존 정책 유지) */
 </style>
 </head>
 <body>
@@ -289,7 +300,7 @@ async function importData(file){
 }
 
 /* ---------- 랜딩 화면: 앱 열면 먼저 보이는 인사 + 오늘의 첫 행동 ---------- */
-function renderLanding(){
+function renderLanding(swipe){
   const dateStr=`${today.getMonth()+1}월 ${today.getDate()}일 ${WD[today.getDay()]}요일`;
   const h=new Date().getHours();
   const greet = h<5?'아직 밤이야' : h<12?'좋은 아침이야' : h<18?'좋은 오후야' : '좋은 저녁이야';
@@ -297,7 +308,7 @@ function renderLanding(){
     ? `<div class="land-note"><div class="lbl">오늘의 첫 행동</div><div class="val">${esc(day.note)}</div></div>`
     : `<div class="land-note empty"><div class="val">오늘의 첫 행동은 아직 비어 있어.<br>점수판에서 내일 할 한 가지를 미리 정해두면, 다음 날 여기 떠 있어.</div></div>`;
   document.getElementById('app').innerHTML=`
-    <div class="landing">
+    <div class="landing${swipe?' swipe-in':''}">
       <div class="land-eyebrow">${dateStr}</div>
       <h1 class="land-h1">${greet}.</h1>
       <p class="land-sub">결과는 네 손에 없어.<br>손에 있는 과정만 세자. 했으면 이긴 거.</p>
@@ -443,6 +454,42 @@ function bind(){
     const f=e.target.files[0]; if(f) await importData(f); e.target.value='';
   };
 }
+
+/* ---------- 탭 모션: 어떤 버튼/항목을 눌러도 리플 + 눌림 효과 ---------- */
+const _reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function spawnRipple(el, x, y){
+  if(_reduceMotion) return;
+  const rect=el.getBoundingClientRect();
+  const size=Math.max(rect.width,rect.height);
+  const r=document.createElement('span');
+  r.className='ripple';
+  r.style.width=r.style.height=size+'px';
+  r.style.left=((x??rect.left+rect.width/2)-rect.left-size/2)+'px';
+  r.style.top =((y??rect.top +rect.height/2)-rect.top -size/2)+'px';
+  el.appendChild(r);
+  setTimeout(()=>r.remove(),560);
+}
+document.addEventListener('pointerdown', e=>{
+  const el=e.target.closest('button, .win');
+  if(el) spawnRipple(el, e.clientX, e.clientY);
+}, {passive:true});
+
+/* ---------- 제스처: 왼→오른쪽 슬라이드 시 랜딩 페이지 ---------- */
+let _sx=0,_sy=0,_st=0,_swiping=false;
+function _gestStart(x,y){ _sx=x; _sy=y; _st=Date.now(); _swiping=true; }
+function _gestEnd(x,y){
+  if(!_swiping) return; _swiping=false;
+  const dx=x-_sx, dy=y-_sy, dt=Date.now()-_st;
+  // 오른쪽으로 충분히(70px+), 빠르게(600ms내), 가로 위주로 이동했을 때
+  if(dt<600 && dx>70 && Math.abs(dx) > Math.abs(dy)*1.8){
+    if(!document.querySelector('.landing')){ renderLanding(true); window.scrollTo(0,0); }
+  }
+}
+document.addEventListener('touchstart', e=>{ const t=e.changedTouches[0]; _gestStart(t.clientX,t.clientY); }, {passive:true});
+document.addEventListener('touchend',   e=>{ const t=e.changedTouches[0]; _gestEnd(t.clientX,t.clientY); }, {passive:true});
+// 마우스(데스크톱)에서도 드래그로 동작
+document.addEventListener('mousedown', e=>_gestStart(e.clientX,e.clientY));
+document.addEventListener('mouseup',   e=>_gestEnd(e.clientX,e.clientY));
 
 /* ---------- 시간 연동: 30초마다 시계 갱신 + 자정 넘어가면 새 날로 ---------- */
 function tick(){
