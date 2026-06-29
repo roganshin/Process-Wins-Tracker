@@ -212,6 +212,33 @@
   .land-btn:active{opacity:.85;transform:scale(.985)}
   .land-skip{margin-top:14px;background:none;border:none;color:var(--mut2);font-size:13px;
     font-family:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+  /* 큰 빨간 전원 버튼 */
+  .power{width:124px;height:124px;border-radius:50%;margin:36px auto 0;display:grid;place-items:center;
+    color:#fff;border:none;cursor:pointer;
+    background:radial-gradient(circle at 50% 36%, #ff6b63, #e0322b 72%);
+    box-shadow:0 12px 32px rgba(224,50,43,.45), inset 0 2px 8px rgba(255,255,255,.3), inset 0 -4px 10px rgba(0,0,0,.18);
+    transition:transform .12s cubic-bezier(.2,.9,.3,1.2), box-shadow .25s}
+  .power:active{transform:scale(.92)}
+  .power svg{width:54px;height:54px}
+  .power.ready{animation:powerPulse 2.4s ease-in-out infinite}
+  @keyframes powerPulse{0%,100%{box-shadow:0 12px 32px rgba(224,50,43,.4), inset 0 2px 8px rgba(255,255,255,.3), inset 0 -4px 10px rgba(0,0,0,.18)}50%{box-shadow:0 12px 40px rgba(224,50,43,.7), inset 0 2px 8px rgba(255,255,255,.35), inset 0 -4px 10px rgba(0,0,0,.18)}}
+  .power-lbl{text-align:center;color:var(--mut);font-size:13px;margin-top:16px;letter-spacing:.02em}
+  .land-status{margin-top:18px}
+
+  /* 로그인 팝업(모달) */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;
+    z-index:50;padding:24px;animation:fadein .2s ease both;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+  .modal{position:relative;background:var(--card);border:1px solid var(--line);border-radius:20px;
+    padding:28px 22px 22px;max-width:340px;width:100%;text-align:center;
+    animation:popin .26s cubic-bezier(.2,1.3,.4,1) both;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  @keyframes popin{from{opacity:0;transform:scale(.9) translateY(10px)}to{opacity:1;transform:none}}
+  .modal h3{font-family:'Fraunces',serif;font-weight:600;font-size:22px;margin-bottom:6px}
+  .modal p{color:var(--mut);font-size:13px;line-height:1.55;margin-bottom:20px}
+  .modal-skip{margin-top:14px;background:none;border:none;color:var(--mut2);font-size:12.5px;
+    font-family:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+  .modal-x{position:absolute;top:12px;right:14px;background:none;border:none;color:var(--mut2);
+    font-size:24px;line-height:1;cursor:pointer;font-family:inherit;width:30px;height:30px}
+
   /* 구글 로그인 */
   .land-auth{margin-top:18px}
   .gbtn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
@@ -277,6 +304,8 @@ function signedIn(){ return !!(USER && CLOUDDATA); }
     if(typeof firebase==='undefined' || !firebase.initializeApp) return;
     firebase.initializeApp(firebaseConfig);
     FB=firebase; AUTH=firebase.auth(); DB=firebase.firestore();
+    // 로그인 상태를 기기에 영구 저장 → 새로고침/재방문해도 로그인 유지
+    try{ AUTH.setPersistence(firebase.auth.Auth.Persistence.LOCAL); }catch(e){ console.warn('[firebase] persistence:',e); }
   }catch(e){ console.warn('[firebase] init 실패, 로컬 모드로 진행:', e); FB=AUTH=DB=null; }
 })();
 
@@ -347,6 +376,7 @@ async function startCloudSync(uid){
 }
 function googleLogin(){
   if(!fbReady()) return;
+  try{ sessionStorage.setItem('loginIntent','1'); }catch(e){}   // 로그인 직후 점수판으로 직행 표시
   const provider=new FB.auth.GoogleAuthProvider();
   AUTH.signInWithPopup(provider).catch(err=>{
     console.warn('[firebase] 팝업 로그인 실패 → 리다이렉트:', err&&err.code);
@@ -354,10 +384,30 @@ function googleLogin(){
   });
 }
 function googleLogout(){ if(fbReady()) AUTH.signOut(); }
+/* 로그인 팝업(모달) */
+function closeLoginModal(){ const m=document.getElementById('loginModal'); if(m) m.remove(); }
+function openLoginModal(){
+  closeLoginModal();
+  const ov=document.createElement('div'); ov.className='modal-bg'; ov.id='loginModal';
+  ov.innerHTML=`<div class="modal">
+    <button class="modal-x" aria-label="닫기">×</button>
+    <h3>로그인</h3>
+    <p>구글로 로그인하면 모든 기기에서<br>기록이 자동으로 동기화돼.</p>
+    <button class="gbtn" id="mGoogle">${SVG_GOOGLE}<span>Google로 계속하기</span></button>
+    <button class="modal-skip" id="mSkip">로그인 없이 이 기기에서 시작</button>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('.modal-x').onclick=closeLoginModal;
+  ov.addEventListener('click',e=>{ if(e.target===ov) closeLoginModal(); });
+  ov.querySelector('#mGoogle').onclick=googleLogin;
+  ov.querySelector('#mSkip').onclick=()=>{ closeLoginModal(); enterApp(); };
+}
 
 /* ---------- helpers ---------- */
 const SVG_CHECK='<svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#241c08" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const SVG_GRIP='<svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+const SVG_POWER='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3.2V11.5"/><path d="M6.2 6.6a8 8 0 1 0 11.6 0"/></svg>';
+const SVG_GOOGLE='<svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.71-1.57 2.68-3.89 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.05l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 9 0 9 9 0 0 0 .96 4.95L3.97 7.3C4.68 5.16 6.66 3.58 9 3.58z"/></svg>';
 const WD=['일','월','화','수','목','금','토'];
 const DEFAULT_WINS=[
   {id:'w1',label:'지원·실행 1건'},
@@ -463,31 +513,35 @@ function renderLanding(swipe){
   const noteBlock = day.note
     ? `<div class="land-note"><div class="lbl">오늘의 첫 행동</div><div class="val">${esc(day.note)}</div></div>`
     : `<div class="land-note empty"><div class="val">오늘의 첫 행동은 아직 비어 있어.<br>점수판에서 내일 할 한 가지를 미리 정해두면, 다음 날 여기 떠 있어.</div></div>`;
-  // 로그인 영역: Firebase 사용 가능할 때만 표시
-  const GSVG='<svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.71-1.57 2.68-3.89 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.05l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 9 0 9 9 0 0 0 .96 4.95L3.97 7.3C4.68 5.16 6.66 3.58 9 3.58z"/></svg>';
-  let authBlock='';
+  // 전원 버튼 아래 상태 표시
+  let statusBlock='';
   if(fbReady()){
     if(USER && _cloudErr){
-      authBlock = `<div class="land-auth"><div class="auth-err">⚠ 클라우드 동기화 실패: <b>${esc(_cloudErr)}</b><br>Firestore 보안 규칙과 승인된 도메인을 확인해줘. (지금은 이 기기에만 저장돼)</div><div class="auth-on" style="margin-top:8px">${esc(USER.email||'')} <button class="linklike" id="logoutBtn">로그아웃</button></div></div>`;
+      statusBlock = `<div class="land-status"><div class="auth-err">⚠ 클라우드 동기화 실패: <b>${esc(_cloudErr)}</b><br>Firestore 규칙·승인된 도메인 확인 필요 (지금은 이 기기에만 저장)</div><div class="auth-on" style="margin-top:8px">${esc(USER.email||'')} <button class="linklike" id="logoutBtn">로그아웃</button></div></div>`;
     } else if(USER && signedIn()){
-      authBlock = `<div class="land-auth"><div class="auth-on"><span class="dot-sync"></span>${esc(USER.email||'로그인됨')} · 실시간 동기화 중 <button class="linklike" id="logoutBtn">로그아웃</button></div></div>`;
+      statusBlock = `<div class="land-status"><div class="auth-on"><span class="dot-sync"></span>${esc(USER.email||'로그인됨')} · 실시간 동기화 <button class="linklike" id="logoutBtn">로그아웃</button></div></div>`;
     } else if(USER){
-      authBlock = `<div class="land-auth"><div class="auth-on"><span class="dot-sync"></span>${esc(USER.email||'')} · 연결 중… <button class="linklike" id="logoutBtn">로그아웃</button></div></div>`;
+      statusBlock = `<div class="land-status"><div class="auth-on"><span class="dot-sync"></span>${esc(USER.email||'')} · 연결 중…</div></div>`;
     } else {
-      authBlock = `<div class="land-auth"><button class="gbtn" id="googleBtn">${GSVG}<span>Google로 계속하기</span></button><div class="auth-note">로그인하면 기기 간 자동 동기화돼. 안 해도 이 기기에 저장돼.</div></div>`;
+      statusBlock = `<div class="land-status"><div class="auth-note">전원 버튼을 누르면 시작 · 로그인하면 기기 간 자동 동기화</div></div>`;
     }
   }
+  const powerLbl = USER ? '눌러서 점수판 열기' : (fbReady()? '눌러서 시작' : '눌러서 점수판 열기');
   document.getElementById('app').innerHTML=`
     <div class="landing${swipe?' swipe-in':''}">
       <div class="land-eyebrow">${dateStr}</div>
       <h1 class="land-h1">${greet}.</h1>
       <p class="land-sub">결과는 네 손에 없어.<br>손에 있는 과정만 세자. 했으면 이긴 거.</p>
       ${noteBlock}
-      <button class="land-btn" id="enterBtn">오늘 점수판 열기</button>
-      ${authBlock}
+      <button class="power ${USER?'ready':''}" id="powerBtn" aria-label="${powerLbl}">${SVG_POWER}</button>
+      <div class="power-lbl">${powerLbl}</div>
+      ${statusBlock}
     </div>`;
-  document.getElementById('enterBtn').onclick=()=>enterApp();
-  const gb=document.getElementById('googleBtn'); if(gb) gb.onclick=googleLogin;
+  document.getElementById('powerBtn').onclick=()=>{
+    if(USER) enterApp();              // 이미 로그인 → 바로 점수판
+    else if(fbReady()) openLoginModal(); // 미로그인 → 로그인 팝업
+    else enterApp();                  // Firebase 불가 → 로컬 모드로 점수판
+  };
   const lo=document.getElementById('logoutBtn'); if(lo) lo.onclick=googleLogout;
 }
 
@@ -945,10 +999,14 @@ if(fbReady()){
     USER = user || null;
     if(user){ await startCloudSync(user.uid); }
     else { if(_unsub){ try{_unsub();}catch(e){} _unsub=null; } CLOUDDATA=null; _cloudErr=null; }
-    try{
-      await load();
-      if(document.querySelector('.landing')) renderLanding(); else render();
-    }catch(e){ console.warn('[firebase] 갱신 실패:',e); }
+    try{ await load(); }catch(e){ console.warn('[firebase] load 실패:',e); }
+    let intent=false; try{ intent=sessionStorage.getItem('loginIntent')==='1'; }catch(e){}
+    if(user && intent){
+      try{ sessionStorage.removeItem('loginIntent'); }catch(e){}
+      closeLoginModal();
+      if(signedIn()){ if(document.querySelector('.landing')) enterApp(); else render(); return; } // 로그인 직후 → 바로 점수판
+    }
+    if(document.querySelector('.landing')) renderLanding(); else render();
   });
 }
 
