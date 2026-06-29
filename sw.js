@@ -1,6 +1,6 @@
 // 오늘의 점수판 — service worker
 // 앱 셸을 캐시해서 오프라인에서도 켜지게 한다. 버전 올리면 캐시 갱신됨.
-const CACHE = 'jumsupan-v10';
+const CACHE = 'jumsupan-v11';
 const SHELL = [
   './',
   './index.html',

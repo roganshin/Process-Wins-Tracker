@@ -596,7 +596,8 @@ function setupWinRow(wrap){
       if(finalX <= -rowW()*0.5){ deleteWin(id); return; }   // 행 절반 이상 → 삭제(빨강 유지)
       else if(finalX <= -BTN*0.5){ open=true;  setX(-BTN); wrap.classList.remove('swiping'); wrap.classList.add('open'); }  // 열기
       else { open=false; setX(0); wrap.classList.remove('swiping','open'); }                  // 닫기(빨강 사라짐)
-    } else if(!moved && !longP){
+    } else if(!longP && !decided){
+      // 방향이 결정될 만큼(14px) 움직이지 않은 작은 동작 = 탭 (손가락 미세 흔들림 허용)
       if(open){ open=false; setX(0); wrap.classList.remove('swiping','open'); }  // 열린 상태 탭 → 닫기
       else toggleWin(id);                                                        // 일반 탭 → 체크
     } else { wrap.classList.remove('swiping'); }
