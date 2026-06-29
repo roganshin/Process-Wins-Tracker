@@ -602,15 +602,28 @@ function setupWinRow(wrap){
       else toggleWin(id);                                                        // 일반 탭 → 체크
     } else { wrap.classList.remove('swiping'); }
   }
-  // 터치(모바일)
-  win.addEventListener('touchstart', e=>{ const t=e.touches[0]; start(t.clientX,t.clientY); }, {passive:true});
-  win.addEventListener('touchmove',  e=>{ const t=e.touches[0]; if(move(t.clientX,t.clientY) && e.cancelable) e.preventDefault(); }, {passive:false});
-  win.addEventListener('touchend',   e=>{ const t=e.changedTouches[0]; if(t) dx=t.clientX-sx; settle(); }, {passive:true});
-  win.addEventListener('touchcancel',e=>{ const t=e.changedTouches[0]; if(t) dx=t.clientX-sx; settle(); }, {passive:true});
-  // 마우스(데스크톱) — 드래그 중에만 window 리스너 부착/해제(누수 방지)
+  // 터치(모바일) — 각 행은 자기 손가락만 식별자로 추적 → 동시 터치 분리, 합성 마우스 무시
+  let touchId=null;
+  win.addEventListener('touchstart', e=>{
+    if(touchId!==null) return;
+    const t=e.changedTouches[0]; touchId=t.identifier;
+    start(t.clientX,t.clientY);
+  }, {passive:true});
+  win.addEventListener('touchmove', e=>{
+    const t=[...e.changedTouches].find(c=>c.identifier===touchId); if(!t) return;
+    if(move(t.clientX,t.clientY) && e.cancelable) e.preventDefault();
+  }, {passive:false});
+  const endTouch=e=>{
+    const t=[...e.changedTouches].find(c=>c.identifier===touchId); if(!t) return;
+    dx=t.clientX-sx; touchId=null; settle();
+  };
+  win.addEventListener('touchend', endTouch, {passive:true});
+  win.addEventListener('touchcancel', endTouch, {passive:true});
+  // 마우스(데스크톱) — 터치 직후 발생하는 합성 마우스는 무시(이중 토글 방지)
   const mm=e=>move(e.clientX,e.clientY);
   const mu=e=>{ dx=e.clientX-sx; window.removeEventListener('mousemove',mm); window.removeEventListener('mouseup',mu); settle(); };
   win.addEventListener('mousedown', e=>{ if(e.button!==0||win.classList.contains('row-editing')) return;
+    if(Date.now()-_lastTouchTime<700) return;
     start(e.clientX,e.clientY); window.addEventListener('mousemove',mm); window.addEventListener('mouseup',mu); });
 }
 
@@ -672,7 +685,7 @@ function setupReorder(){
     // 마우스(데스크톱)
     const gm=e=>reorderMove(e.clientY);
     const gu=e=>{ window.removeEventListener('mousemove',gm); window.removeEventListener('mouseup',gu); reorderEnd(); };
-    grip.addEventListener('mousedown', e=>{ e.stopPropagation(); e.preventDefault();
+    grip.addEventListener('mousedown', e=>{ if(Date.now()-_lastTouchTime<700) return; e.stopPropagation(); e.preventDefault();
       reorderStart(e.clientY, wrap); window.addEventListener('mousemove',gm); window.addEventListener('mouseup',gu); });
   });
 }
@@ -737,7 +750,7 @@ document.addEventListener('pointerdown', e=>{
 }, {passive:true});
 
 /* ---------- 제스처: 왼→오른쪽 슬라이드 시 랜딩 페이지 ---------- */
-let _sx=0,_sy=0,_st=0,_swiping=false,_winHoriz=false;
+let _sx=0,_sy=0,_st=0,_swiping=false,_winHoriz=false,_lastTouchTime=0;
 function _gestStart(x,y){ _sx=x; _sy=y; _st=Date.now(); _swiping=true; _winHoriz=false; }
 function _gestEnd(x,y){
   if(!_swiping) return; _swiping=false;
@@ -748,11 +761,13 @@ function _gestEnd(x,y){
     if(!document.querySelector('.landing')){ renderLanding(true); window.scrollTo(0,0); }
   }
 }
+// 터치 시각 기록(합성 마우스 무시용) — 캡처 단계에서 가장 먼저 실행
+document.addEventListener('touchstart', ()=>{ _lastTouchTime=Date.now(); }, {capture:true, passive:true});
 document.addEventListener('touchstart', e=>{ const t=e.changedTouches[0]; _gestStart(t.clientX,t.clientY); }, {passive:true});
 document.addEventListener('touchend',   e=>{ const t=e.changedTouches[0]; _gestEnd(t.clientX,t.clientY); }, {passive:true});
-// 마우스(데스크톱)에서도 드래그로 동작
-document.addEventListener('mousedown', e=>_gestStart(e.clientX,e.clientY));
-document.addEventListener('mouseup',   e=>_gestEnd(e.clientX,e.clientY));
+// 마우스(데스크톱)에서도 드래그로 동작 — 터치 직후 합성 마우스는 무시
+document.addEventListener('mousedown', e=>{ if(Date.now()-_lastTouchTime<700) return; _gestStart(e.clientX,e.clientY); });
+document.addEventListener('mouseup',   e=>{ if(Date.now()-_lastTouchTime<700) return; _gestEnd(e.clientX,e.clientY); });
 
 /* ---------- 시간 연동: 30초마다 시계 갱신 + 자정 넘어가면 새 날로 ---------- */
 function tick(){
