@@ -212,6 +212,20 @@
   .land-btn:active{opacity:.85;transform:scale(.985)}
   .land-skip{margin-top:14px;background:none;border:none;color:var(--mut2);font-size:13px;
     font-family:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+  /* 구글 로그인 */
+  .land-auth{margin-top:18px}
+  .gbtn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
+    background:#fff;color:#3c4043;border:1px solid #dadce0;border-radius:13px;padding:13px;
+    font-size:14.5px;font-weight:600;font-family:inherit;cursor:pointer;transition:transform .08s,box-shadow .15s}
+  .gbtn:active{transform:scale(.985)}
+  .gbtn:hover{box-shadow:0 1px 6px rgba(0,0,0,.18)}
+  .gbtn svg{flex:none}
+  .auth-note{color:var(--mut2);font-size:11.5px;margin-top:10px;line-height:1.5}
+  .auth-on{color:var(--mut);font-size:13px;display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap}
+  .dot-sync{width:7px;height:7px;border-radius:50%;background:var(--teal);display:inline-block;
+    box-shadow:0 0 0 0 var(--teal);animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(103,166,171,.5)}70%{box-shadow:0 0 0 6px rgba(103,166,171,0)}100%{box-shadow:0 0 0 0 rgba(103,166,171,0)}}
+  .linklike{background:none;border:none;color:var(--gold);font-size:13px;font-family:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
   .landing.swipe-in{animation:slideInLeft .34s cubic-bezier(.2,.8,.3,1) both}
   @keyframes slideInLeft{from{opacity:0;transform:translateX(-44px)}to{opacity:1;transform:none}}
   /* 랜딩 → 본화면 고급 전환: 랜딩은 왼쪽으로 빠지고, 본화면은 오른쪽에서 들어옴 */
@@ -235,20 +249,85 @@
 <body>
   <div id="app"><div class="loading">불러오는 중…</div></div>
 
+<!-- Firebase SDK (compat) — 구글 로그인 + Firestore 동기화 -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
 <script>
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
 
-/* ---------- storage: window.storage(클라우드) 우선, 없으면 localStorage ---------- */
-const CLOUD = (typeof window!=='undefined' && window.storage && typeof window.storage.get==='function');
-const STORE_LABEL = CLOUD ? '클라우드 저장' : '이 기기에 저장';
+/* ---------- Firebase 초기화 (실패 시 로컬 모드로 자연 폴백) ---------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyAuix1dYheROd2MSLLu2GnUpM9LHU0nsKM",
+  authDomain: "process-wins-tracker.firebaseapp.com",
+  projectId: "process-wins-tracker",
+  storageBucket: "process-wins-tracker.firebasestorage.app",
+  messagingSenderId: "37427144018",
+  appId: "1:37427144018:web:9f2a66ccb1b667e5a8068b",
+  measurementId: "G-83KL1X0ZVH"
+};
+let FB=null, AUTH=null, DB=null, USER=null, CLOUDDATA=null;
+function fbReady(){ return !!AUTH; }
+function signedIn(){ return !!(USER && CLOUDDATA); }
+(function initFirebase(){
+  try{
+    if(typeof firebase==='undefined' || !firebase.initializeApp) return;
+    firebase.initializeApp(firebaseConfig);
+    FB=firebase; AUTH=firebase.auth(); DB=firebase.firestore();
+  }catch(e){ console.warn('[firebase] init 실패, 로컬 모드로 진행:', e); FB=AUTH=DB=null; }
+})();
+
+/* ---------- storage: 로그인 시 Firestore, 아니면 localStorage ---------- */
+const CLOUD = (typeof window!=='undefined' && window.storage && typeof window.storage.get==='function'); // (Claude 아티팩트 환경)
+function storeLabel(){ return signedIn() ? '클라우드 동기화' : (CLOUD ? '클라우드 저장' : '이 기기에 저장'); }
 async function sget(k){
+  if(signedIn()) return (CLOUDDATA && k in CLOUDDATA) ? CLOUDDATA[k] : null;
   if(CLOUD){ try{const r=await window.storage.get(k); return r?JSON.parse(r.value):null;}catch(e){return null;} }
   try{const v=localStorage.getItem(k); return v?JSON.parse(v):null;}catch(e){return null;}
 }
 async function sset(k,v){
+  if(signedIn()){
+    CLOUDDATA[k]=v;
+    try{ await DB.collection('users').doc(USER.uid).set({data:{[k]:v}},{merge:true}); }catch(e){ console.warn('[firebase] 저장 실패:',e); }
+    return;
+  }
   if(CLOUD){ try{await window.storage.set(k,JSON.stringify(v)); return;}catch(e){} }
   try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}
 }
+/* 로컬(localStorage)의 모든 키를 모아 반환 — 클라우드 최초 이전용 */
+function collectLocal(){
+  const out={};
+  try{
+    const c=localStorage.getItem('config'); if(c) out.config=JSON.parse(c);
+    const i=localStorage.getItem('index'); if(i) out.index=JSON.parse(i);
+    for(let n=0;n<localStorage.length;n++){ const key=localStorage.key(n);
+      if(key&&key.indexOf('day:')===0){ try{ out[key]=JSON.parse(localStorage.getItem(key)); }catch(e){} } }
+  }catch(e){}
+  return out;
+}
+/* 로그인 직후: 클라우드 문서 로드(+ 비어 있으면 로컬 데이터 자동 이전) */
+async function loadCloud(uid){
+  try{
+    const ref=DB.collection('users').doc(uid);
+    const snap=await ref.get();
+    CLOUDDATA = (snap.exists && snap.data() && snap.data().data) ? snap.data().data : {};
+    if(!CLOUDDATA.config){
+      const local=collectLocal();
+      if(local.config){ CLOUDDATA={...CLOUDDATA, ...local}; await ref.set({data:CLOUDDATA},{merge:true}); }
+    }
+    return true;
+  }catch(e){ console.warn('[firebase] 클라우드 로드 실패:',e); CLOUDDATA=null; return false; }
+}
+function googleLogin(){
+  if(!fbReady()) return;
+  const provider=new FB.auth.GoogleAuthProvider();
+  AUTH.signInWithPopup(provider).catch(err=>{
+    console.warn('[firebase] 팝업 로그인 실패 → 리다이렉트:', err&&err.code);
+    try{ AUTH.signInWithRedirect(provider); }catch(e){ alert('로그인을 시작할 수 없어. 잠시 후 다시 시도해줘.'); }
+  });
+}
+function googleLogout(){ if(fbReady()) AUTH.signOut(); }
 
 /* ---------- helpers ---------- */
 const SVG_CHECK='<svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#241c08" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -358,6 +437,14 @@ function renderLanding(swipe){
   const noteBlock = day.note
     ? `<div class="land-note"><div class="lbl">오늘의 첫 행동</div><div class="val">${esc(day.note)}</div></div>`
     : `<div class="land-note empty"><div class="val">오늘의 첫 행동은 아직 비어 있어.<br>점수판에서 내일 할 한 가지를 미리 정해두면, 다음 날 여기 떠 있어.</div></div>`;
+  // 로그인 영역: Firebase 사용 가능할 때만 표시
+  const GSVG='<svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.71-1.57 2.68-3.89 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.05l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 9 0 9 9 0 0 0 .96 4.95L3.97 7.3C4.68 5.16 6.66 3.58 9 3.58z"/></svg>';
+  let authBlock='';
+  if(fbReady()){
+    authBlock = USER
+      ? `<div class="land-auth"><div class="auth-on"><span class="dot-sync"></span>${esc(USER.email||'로그인됨')} · 동기화 중 <button class="linklike" id="logoutBtn">로그아웃</button></div></div>`
+      : `<div class="land-auth"><button class="gbtn" id="googleBtn">${GSVG}<span>Google로 계속하기</span></button><div class="auth-note">로그인하면 기기 간 자동 동기화돼. 안 해도 이 기기에 저장돼.</div></div>`;
+  }
   document.getElementById('app').innerHTML=`
     <div class="landing${swipe?' swipe-in':''}">
       <div class="land-eyebrow">${dateStr}</div>
@@ -365,8 +452,11 @@ function renderLanding(swipe){
       <p class="land-sub">결과는 네 손에 없어.<br>손에 있는 과정만 세자. 했으면 이긴 거.</p>
       ${noteBlock}
       <button class="land-btn" id="enterBtn">오늘 점수판 열기</button>
+      ${authBlock}
     </div>`;
   document.getElementById('enterBtn').onclick=()=>enterApp();
+  const gb=document.getElementById('googleBtn'); if(gb) gb.onclick=googleLogin;
+  const lo=document.getElementById('logoutBtn'); if(lo) lo.onclick=googleLogout;
 }
 
 /* 랜딩 → 본화면: 랜딩이 부드럽게 빠지고 본화면이 슬라이드-페이드로 들어옴 */
@@ -478,7 +568,7 @@ async function render(){
      </div>
     </div>
 
-    <div class="foot">매일 밤 한 번 들러서 점수만 채워.<br><span class="badge">${STORE_LABEL} · 시간 자동 연동</span></div>
+    <div class="foot">매일 밤 한 번 들러서 점수만 채워.<br><span class="badge">${storeLabel()} · 시간 자동 연동</span></div>
   `;
   bind();
 }
@@ -816,6 +906,18 @@ const _loadGuard=setTimeout(()=>{
     console.error('[점수판] init error:', err);
   }
 })();
+
+/* 로그인 상태 변화 → 클라우드 로드/이전 후 현재 화면 갱신 */
+if(fbReady()){
+  AUTH.onAuthStateChanged(async user=>{
+    USER = user || null;
+    if(user){ await loadCloud(user.uid); } else { CLOUDDATA=null; }
+    try{
+      await load();
+      if(document.querySelector('.landing')) renderLanding(); else render();
+    }catch(e){ console.warn('[firebase] 갱신 실패:',e); }
+  });
+}
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
